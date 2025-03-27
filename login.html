@@ -1,5 +1,62 @@
-<form method="POST">
-    <input type="email" name="email" placeholder="電子郵件" required>
-    <input type="password" name="password" placeholder="密碼" required>
-    <button type="submit">登入</button>
-</form>
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用戶註冊</title>
+</head>
+<body>
+    <h2>用戶註冊</h2>
+    <form id="registerForm">
+        <label for="name">姓名：</label>
+        <input type="text" id="name" name="name" required><br>
+
+        <label for="phone">電話：</label>
+        <input type="text" id="phone" name="phone" required><br>
+
+        <label for="email">Email：</label>
+        <input type="email" id="email" name="email" required><br>
+
+        <label for="password">密碼：</label>
+        <input type="password" id="password" name="password" required><br>
+
+        <button type="submit">註冊</button>
+    </form>
+
+    <script>
+        document.getElementById("registerForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            // 創建一個物件來存儲表單資料
+            const formData = {
+                name: document.getElementById("name").value,
+                phone: document.getElementById("phone").value,
+                email: document.getElementById("email").value,
+                password: document.getElementById("password").value
+            };
+
+            // 發送 JSON 格式的請求
+            const response = await fetch("http://127.0.0.1:8000/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(formData)  // 將表單資料轉換為 JSON 字串
+            });
+
+            const result = await response.json();  // 解析返回的 JSON 響應
+
+            if (!response.ok) {
+                let errorMessage = "發生錯誤：";
+                result.detail.forEach(err => {
+                    errorMessage += `字段 ${err.loc[1]} 錯誤: ${err.msg}\n`;  // 獲取字段名和錯誤消息
+                });
+                alert(errorMessage);  // 顯示所有的錯誤信息
+            } else {
+                alert(result.message);  // 顯示成功消息
+            }
+        });
+    </script>
+</body>
+</html>
