@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.responses import JSONResponse
 
 # 資料庫連線設定
 DB_USERNAME = "root"
@@ -24,7 +24,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # 定義 User 資料表
 class User(Base):
-    __tablename__ = "users1"
+    __tablename__ = "users"
 
     UserID = Column(Integer, primary_key=True, index=True)  # 使用 UserID 而不是 id
     name = Column(String(50))
@@ -58,9 +58,21 @@ class UserCreate(BaseModel):
     class Config:
          from_attributes = True  # 確保與 SQLAlchemy 模型的屬性匹配
 
+# Pydantic 模型：登入資料
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+    class Config:
+         from_attributes = True  # 確保與 SQLAlchemy 模型的屬性匹配
+
 # 密碼加密
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+# 密碼驗證
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 # API：用戶註冊
 @app.post("/register")
@@ -86,12 +98,31 @@ async def register_user(user: UserCreate, request: Request):
 
         return {"message": "用戶註冊成功", "user_id": new_user.UserID}  # 返回 UserID 而非 id
 
-    except ValidationError as e:
-        return {"detail": e.errors()}  # 返回詳細的驗證錯誤信息
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
     finally:
         db.close()  # 確保資料庫會話關閉
-        #  cd "C:\Users\lunnn\OneDrive\桌面"
-           #uvicorn main:app --reload                                 
+
+# API：用戶登入
+@app.post("/login")
+async def login_user(user: UserLogin, request: Request):
+    try:
+        db = SessionLocal()
+        # 查找用戶
+        existing_user = db.query(User).filter(User.email == user.email).first()
+        if not existing_user:
+            raise HTTPException(status_code=400, detail="用戶不存在")
+
+        # 驗證密碼
+        if not verify_password(user.password, existing_user.password):
+            raise HTTPException(status_code=400, detail="密碼錯誤")
+
+        return {"message": "登入成功", "user_id": existing_user.UserID}
+
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        db.close()  # 確保資料庫會話關閉
+ #  cd "C:\Users\lunnn\OneDrive\桌面"
+           #uvicorn main:app --reload       
 
