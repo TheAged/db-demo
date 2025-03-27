@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>用戶註冊</title>
+    <title>用戶註冊與登入</title>
 </head>
 <body>
     <h2>用戶註冊</h2>
@@ -24,11 +23,22 @@
         <button type="submit">註冊</button>
     </form>
 
+    <h2>用戶登入</h2>
+    <form id="loginForm">
+        <label for="loginEmail">Email：</label>
+        <input type="email" id="loginEmail" name="loginEmail" required><br>
+
+        <label for="loginPassword">密碼：</label>
+        <input type="password" id="loginPassword" name="loginPassword" required><br>
+
+        <button type="submit">登入</button>
+    </form>
+
     <script>
+        // 註冊表單提交處理
         document.getElementById("registerForm").addEventListener("submit", async function(event) {
             event.preventDefault();
 
-            // 創建一個物件來存儲表單資料
             const formData = {
                 name: document.getElementById("name").value,
                 phone: document.getElementById("phone").value,
@@ -36,27 +46,53 @@
                 password: document.getElementById("password").value
             };
 
-            // 發送 JSON 格式的請求
             const response = await fetch("http://127.0.0.1:8000/register", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify(formData)  // 將表單資料轉換為 JSON 字串
+                body: JSON.stringify(formData)
             });
 
-            const result = await response.json();  // 解析返回的 JSON 響應
+            const result = await response.json();
 
             if (!response.ok) {
                 let errorMessage = "發生錯誤：";
                 result.detail.forEach(err => {
-                    errorMessage += `字段 ${err.loc[1]} 錯誤: ${err.msg}\n`;  // 獲取字段名和錯誤消息
+                    errorMessage += `字段 ${err.loc[1]} 錯誤: ${err.msg}\n`;
                 });
-                alert(errorMessage);  // 顯示所有的錯誤信息
+                alert(errorMessage);
             } else {
-                alert(result.message);  // 顯示成功消息
+                alert(result.message);
             }
         });
+
+        // 登入表單提交處理
+        document.getElementById("loginForm").addEventListener("submit", async function(event) {
+    event.preventDefault();
+
+    const loginData = {
+        email: document.getElementById("loginEmail").value,
+        password: document.getElementById("loginPassword").value
+    };
+
+    const response = await fetch("http://127.0.0.1:8000/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(loginData)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+        alert(result.detail);  // 顯示錯誤消息
+    } else {
+        alert(result.message);  // 顯示登入成功消息
+    }
+});
+
     </script>
 </body>
 </html>
