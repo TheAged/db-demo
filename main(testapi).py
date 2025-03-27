@@ -7,10 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # 資料庫連線設定
-DB_USERNAME = "root"
-DB_PASSWORD = "qwertyuiop123"
-DB_HOST = "localhost"
-DB_NAME = "world"
 
 DATABASE_URL = f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
 
