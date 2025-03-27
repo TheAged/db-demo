@@ -1,0 +1,8 @@
+CREATE TABLE Elderly (
+    elderly_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(50),
+    gender ENUM('男', '女'),
+    birth_date DATE,
+    emergency_contact VARCHAR(100),
+    address TEXT
+);
