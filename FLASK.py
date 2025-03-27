@@ -1,86 +1,81 @@
-Python 3.12.2 (tags/v3.12.2:6abddd9, Feb  6 2024, 21:26:36) [MSC v.1937 64 bit (AMD64)] on win32
-Type "help", "copyright", "credits" or "license()" for more information.
->>> from flask import Flask, render_template, request, redirect, url_for, flash, session
-... from flask_mysqldb import MySQL
-... from flask_bcrypt import Bcrypt
-... from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-... 
-... app = Flask(__name__)
-... app.secret_key = 'your_secret_key'
-... 
-... # MySQL 設定
-... app.config['MYSQL_HOST'] = 'your-db-host'
-... app.config['MYSQL_USER'] = 'your-db-user'
-... app.config['MYSQL_PASSWORD'] = 'your-db-password'
-... app.config['MYSQL_DB'] = 'your-database'
-... mysql = MySQL(app)
-... 
-... bcrypt = Bcrypt(app)
-... login_manager = LoginManager(app)
-... login_manager.login_view = 'login'
-... 
-... class User(UserMixin):
-...     def __init__(self, user_id, name, email):
-...         self.id = user_id
-...         self.name = name
-...         self.email = email
-... 
-... @login_manager.user_loader
-... def load_user(user_id):
-...     cur = mysql.connection.cursor()
-...     cur.execute("SELECT UserID, Name, Email FROM Users WHERE UserID = %s", (user_id,))
-...     user = cur.fetchone()
-...     cur.close()
-...     if user:
-...         return User(user[0], user[1], user[2])
-...     return None
-... 
-... @app.route('/register', methods=['GET', 'POST'])
-... def register():
-...     if request.method == 'POST':
-...         name = request.form['name']
-...         email = request.form['email']
-...         password = request.form['password']
-...         hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-... 
-...         cur = mysql.connection.cursor()
-...         cur.execute("INSERT INTO Users (Name, Email, PasswordHash) VALUES (%s, %s, %s)", (name, email, hashed_pw))
-...         mysql.connection.commit()
-...         cur.close()
-...         flash("註冊成功，請登入！")
-...         return redirect(url_for('login'))
-...     return render_template('register.html')
-... 
-... @app.route('/login', methods=['GET', 'POST'])
-... def login():
-...     if request.method == 'POST':
-...         email = request.form['email']
-...         password = request.form['password']
-... 
-...         cur = mysql.connection.cursor()
-...         cur.execute("SELECT UserID, Name, Email, PasswordHash FROM Users WHERE Email = %s", (email,))
-...         user = cur.fetchone()
-...         cur.close()
-... 
-...         if user and bcrypt.check_password_hash(user[3], password):
-...             login_user(User(user[0], user[1], user[2]))
-...             flash("登入成功！")
-...             return redirect(url_for('dashboard'))
-...         else:
-...             flash("帳號或密碼錯誤")
-...     return render_template('login.html')
-... 
-... @app.route('/dashboard')
-... @login_required
-... def dashboard():
-    return f"歡迎 {current_user.name}，這是你的儀表板！"
+from fastapi import FastAPI, HTTPException, Form
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr, Field
+from passlib.context import CryptContext
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    flash("登出成功")
-    return redirect(url_for('login'))
+# 資料庫連線設定
+DB_USERNAME = "root"
+DB_PASSWORD = "qwertyuiop123"
+DB_HOST = "localhost"
+DB_NAME = "world"
 
-if __name__ == '__main__':
-    app.run(debug=True)
+DATABASE_URL = f"mysql+pymysql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+
+# 設定 SQLAlchemy
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# 密碼加密上下文
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# 定義 User 資料表
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50))
+    phone = Column(String(20))
+    email = Column(String(100))
+    password = Column(String(100))
+
+# 建立資料表
+Base.metadata.create_all(bind=engine)
+
+# 啟動 FastAPI
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允許所有來源（開發時使用，正式環境請設置特定網域）
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic 模型：使用者註冊資料
+class UserCreate(BaseModel):
+    name: str
+    phone: str = Field(..., pattern=r'^\+?\d{10,15}$')  # 使用 Field 和 pattern 驗證電話號碼格式
+    email: EmailStr  # 郵箱格式
+    password: str
+
+    class Config:
+         from_attributes = True
+
+# 密碼哈希加密
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+# API：用戶註冊
+@app.post("/register")
+def register_user(user: UserCreate):
+    db = SessionLocal()
+    # 檢查郵箱是否已經註冊
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="該 Email 已經註冊過")
+
+    # 加密密碼
+    hashed_password = get_password_hash(user.password)
+    new_user = User(name=user.name, phone=user.phone, email=user.email, password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    db.close()
+    
+    return {"message": "用戶註冊成功", "user_id": new_user.id}
+
+# 啟動伺服器
+# 在終端機執行： uvicorn main:app --reload
+
